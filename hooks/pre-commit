@@ -1,0 +1,22 @@
+#!/bin/sh
+# Optional pre-commit hook: block a commit if this repo's knowledge/ bundle
+# does not conform to the OKF house standard.
+#
+# Install (run once inside a portfolio repo, from its root):
+#   git config core.hooksPath .githooks
+#   mkdir -p .githooks
+#   cp ../okf-portfolio-standard/hooks/pre-commit .githooks/pre-commit
+#   chmod +x .githooks/pre-commit
+#
+# Requires Node and a local clone of okf-portfolio-standard as a sibling directory.
+
+VALIDATOR="$(git rev-parse --show-toplevel)/../okf-portfolio-standard/bin/okf-validate.mjs"
+if [ ! -f "$VALIDATOR" ]; then
+  echo "okf pre-commit: validator not found at $VALIDATOR (skipping)"
+  exit 0
+fi
+
+node "$VALIDATOR" "$(git rev-parse --show-toplevel)" || {
+  echo "okf pre-commit: knowledge/ bundle failed validation — commit blocked."
+  exit 1
+}

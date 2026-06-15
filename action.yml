@@ -1,0 +1,16 @@
+name: 'OKF Bundle Validate'
+description: "Validate a repo's knowledge/ OKF bundle against the portfolio house standard."
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  path:
+    description: 'Path to the repo root (containing knowledge/) or a knowledge/ directory.'
+    required: false
+    default: '.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate OKF bundle
+      shell: bash
+      run: node "${{ github.action_path }}/bin/okf-validate.mjs" "${{ inputs.path }}"
