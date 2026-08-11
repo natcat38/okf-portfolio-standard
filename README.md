@@ -11,6 +11,11 @@ and this repo is the single source of truth for the rules and the check.
 - **The validator:** [`bin/okf-validate.mjs`](bin/okf-validate.mjs) — zero-dependency Node
 - **The CI hook:** [`action.yml`](action.yml) — a composite GitHub Action
 
+Beyond the original OKF-derived checks, the validator also enforces that every
+concept is reachable from `index.md` (no orphans), that `index.md` and any
+repo-root `CLAUDE.md` stay short (routing, not payload), and that concept files
+stay under a size budget — see rules 9-12 in `STANDARD.md`.
+
 ## Validate locally
 
 ```bash
@@ -42,6 +47,12 @@ jobs:
         with:
           path: .
 ```
+
+## Adopting in a new repo
+
+1. Copy `templates/` into the new repo as its `knowledge/` bundle starting point.
+2. Add the `.github/workflows/okf.yml` snippet above (from "Validate in CI").
+3. Run the validator locally: `node bin/okf-validate.mjs .`
 
 ## Consumers
 

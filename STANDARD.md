@@ -44,6 +44,28 @@ my own repos, and any bundle that passes it is also a valid OKF bundle.
 | 6 | Internal links (`/abs`, `./rel`) resolve | tolerated | **error if broken** |
 | 7 | Concept filename is kebab-case (= concept id) | n/a | **required** |
 | 8 | `log.md` headings are ISO-8601 dates (if present) | optional shape | checked if present |
+| 9 | No orphan concepts — every concept reachable from `index.md` (BFS) | n/a | **required** |
+| 10 | `index.md` stays ≤ 60 lines (routing, not payload) | n/a | **required** |
+| 11 | Concept file stays ≤ 8 KB | n/a | **required** |
+| 12 | Repo-root `CLAUDE.md` stays ≤ 60 lines (if present) | n/a | **required** |
+
+## Relationship to ICM
+
+Rules 9–12 borrow the "small, navigable, reachable" discipline of the
+[Interpretable Context Methodology](https://github.com/RinDig/icm-architect): an
+entry point should route rather than contain, individual context files should
+stay small enough to read in one pass, and nothing should be left dangling and
+unreferenced. That's the useful part, and it transfers cleanly to any repo.
+
+What was deliberately **not** borrowed: numbered stage folders (`01_`, `02_`),
+per-folder `CONTEXT.md` contracts, factory/product separation, human edit gates,
+and `output/` directories. Those encode a sequential, human-in-the-loop pipeline
+*workspace* — a place where stages hand off artifacts to a human before the next
+stage runs. A Next.js app or a Go service is not that; its directory structure is
+already dictated by its framework and build tooling. Layering ICM's pipeline
+scaffolding on top would mean fighting the toolchain for no gain, so this profile
+takes only the shape constraints (reachability, size caps) and leaves the
+workflow scaffolding behind.
 
 ## Concept frontmatter
 
