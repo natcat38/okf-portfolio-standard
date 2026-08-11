@@ -11,12 +11,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      # Passed as bare knowledge/ dirs on purpose, so these exercise the bundle
+      # rules (1-11) alone. Passing the parent would make them repo roots and
+      # drag in the CLAUDE.md / FILE-MAP.md expectations they aren't testing.
       - name: Good fixture must pass
-        run: node bin/okf-validate.mjs tests/fixtures/good
+        run: node bin/okf-validate.mjs tests/fixtures/good/knowledge
       - name: Bad fixture must fail
         run: |
-          if node bin/okf-validate.mjs tests/fixtures/bad; then
+          if node bin/okf-validate.mjs tests/fixtures/bad/knowledge; then
             echo "::error::bad fixture unexpectedly passed"
             exit 1
           fi
           echo "bad fixture failed as expected"
+
+      # Repo-root fixtures: rules 12 and 13 only fire when given a repo root, so
+      # the bare knowledge/ fixtures above can never exercise them.
+      - name: Good repo fixture must pass
+        run: node bin/okf-validate.mjs tests/fixtures/repo-good
+
+      - name: Bad repo fixture must fail
+        run: |
+          if node bin/okf-validate.mjs tests/fixtures/repo-bad; then
+            echo "::error::bad repo fixture unexpectedly passed"
+            exit 1
+          fi
+          echo "bad repo fixture failed as expected"

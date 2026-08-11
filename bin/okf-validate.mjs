@@ -119,6 +119,23 @@ function countLines(text) {
   return lines.length;
 }
 
+// Directories listed in a FILE-MAP.md table whose Purpose cell is empty.
+// Rows look like: | `internal/ws` | 7 | ws is the fan-out hub. |
+// The separator row (| --- | ---: | --- |) and the header are skipped.
+function undocumentedDirs(text) {
+  const out = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t.startsWith('|')) continue;
+    const cells = t.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length < 3) continue;
+    const dir = cells[0].replace(/`/g, '');
+    if (!dir || /^-+:?$/.test(dir) || dir.toLowerCase() === 'directory') continue;
+    if (!cells[cells.length - 1]) out.push(dir);
+  }
+  return out;
+}
+
 // Pull internal link targets out of markdown (skips external + anchor-only links).
 function internalLinks(body) {
   const targets = [];
@@ -290,6 +307,24 @@ function main() {
             file: 'CLAUDE.md',
             level: 'error',
             msg: `CLAUDE.md is ${lines} lines, exceeds ${CLAUDE_MD_MAX_LINES}-line cap`,
+          });
+        }
+      }
+    }
+
+    // Rule 13 — FILE-MAP.md: a generated directory index so an agent can orient
+    // without crawling the tree. Every row must declare a purpose; a blank one
+    // means a source directory nothing describes. Repo-root check, like rule 12.
+    if (repoRoot) {
+      const mapPath = path.join(repoRoot, 'FILE-MAP.md');
+      if (!fs.existsSync(mapPath)) {
+        findings.push({ file: 'FILE-MAP.md', level: 'error', msg: 'required file is missing' });
+      } else {
+        for (const dir of undocumentedDirs(fs.readFileSync(mapPath, 'utf8'))) {
+          findings.push({
+            file: 'FILE-MAP.md',
+            level: 'error',
+            msg: `source directory declares no purpose: ${dir}`,
           });
         }
       }
