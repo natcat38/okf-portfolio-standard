@@ -18,11 +18,17 @@
 //   - `timestamp` must be valid ISO 8601
 //   - internal links (`/abs` and `./rel`) must resolve
 //   - concept filenames must be kebab-case
+//   - every concept must be reachable from index.md (no orphans)
+//   - index.md stays under a line cap; concept files stay under a byte cap
+//   - repo-root CLAUDE.md (if present) stays under a line cap
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 const RESERVED = new Set(['index.md', 'log.md']);
+const INDEX_MAX_LINES = 60;
+const CONCEPT_MAX_BYTES = 8 * 1024;
+const CLAUDE_MD_MAX_LINES = 60;
 
 // ---------- small helpers ----------
 
@@ -103,6 +109,14 @@ function isIso8601(v) {
 
 function isKebab(name) {
   return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name);
+}
+
+// Line count that matches `wc -l` intuition: a single trailing newline ends the
+// last line rather than starting an empty one.
+function countLines(text) {
+  const lines = text.split(/\r?\n/);
+  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  return lines.length;
 }
 
 // Pull internal link targets out of markdown (skips external + anchor-only links).
@@ -186,16 +200,67 @@ function validateBundle(bundleDir) {
 
   if (conceptCount === 0) add('.', 'bundle has no concept files (needs at least one)');
 
+  // Rule 9 — no orphan concepts: every concept must be reachable from index.md via BFS.
+  if (fs.existsSync(indexPath)) {
+    const visited = new Set([indexPath]);
+    const queue = [indexPath];
+    while (queue.length) {
+      const cur = queue.shift();
+      let text;
+      try { text = fs.readFileSync(cur, 'utf8'); } catch { continue; }
+      const fm = splitFrontmatter(text);
+      const body = fm.has && !fm.unterminated ? fm.body : text;
+      for (const target of internalLinks(body)) {
+        if (!target.toLowerCase().endsWith('.md')) continue;
+        const resolved = target.startsWith('/')
+          ? path.join(bundleDir, target.slice(1))
+          : path.resolve(path.dirname(cur), target);
+        if (fs.existsSync(resolved) && !visited.has(resolved)) {
+          visited.add(resolved);
+          queue.push(resolved);
+        }
+      }
+    }
+    for (const file of files) {
+      const base = path.basename(file);
+      if (RESERVED.has(base)) continue;
+      if (!visited.has(file)) {
+        add(rel(file), 'orphan concept: not reachable from index.md');
+      }
+    }
+  }
+
+  // Rule 10 — index.md is routing, not payload: keep it short.
+  if (fs.existsSync(indexPath)) {
+    const indexLines = countLines(fs.readFileSync(indexPath, 'utf8'));
+    if (indexLines > INDEX_MAX_LINES) {
+      add('index.md', `index.md is ${indexLines} lines, exceeds ${INDEX_MAX_LINES}-line cap`);
+    }
+  }
+
+  // Rule 11 — concept size budget.
+  for (const file of files) {
+    const base = path.basename(file);
+    if (RESERVED.has(base)) continue;
+    const size = fs.statSync(file).size;
+    if (size > CONCEPT_MAX_BYTES) {
+      add(rel(file), `concept file is ${size} bytes, exceeds ${CONCEPT_MAX_BYTES}-byte cap`);
+    }
+  }
+
   return findings;
 }
 
 // ---------- entry ----------
 
+// Returns { bundleDir, repoRoot } where repoRoot is the repo root that contains
+// `knowledge/`, or null when a bare `knowledge/` dir was handed in directly
+// (repoRoot cannot be inferred in that case). Returns null if no bundle found.
 function resolveBundle(p) {
   const abs = path.resolve(p);
-  if (path.basename(abs) === 'knowledge' && isDir(abs)) return abs;
+  if (path.basename(abs) === 'knowledge' && isDir(abs)) return { bundleDir: abs, repoRoot: null };
   const k = path.join(abs, 'knowledge');
-  if (isDir(k)) return k;
+  if (isDir(k)) return { bundleDir: k, repoRoot: abs };
   return null;
 }
 
@@ -205,13 +270,31 @@ function main() {
 
   let total = 0;
   for (const input of inputs) {
-    const bundle = resolveBundle(input);
-    if (!bundle) {
+    const resolved = resolveBundle(input);
+    if (!resolved) {
       console.error(`✗ ${input}: no knowledge/ bundle found`);
       total++;
       continue;
     }
+    const { bundleDir: bundle, repoRoot } = resolved;
     const findings = validateBundle(bundle);
+
+    // Rule 12 — entry file cap. Only checked when we were handed a repo root
+    // (not a bare knowledge/ dir), and only if CLAUDE.md actually exists there.
+    if (repoRoot) {
+      const claudeMdPath = path.join(repoRoot, 'CLAUDE.md');
+      if (fs.existsSync(claudeMdPath)) {
+        const lines = countLines(fs.readFileSync(claudeMdPath, 'utf8'));
+        if (lines > CLAUDE_MD_MAX_LINES) {
+          findings.push({
+            file: 'CLAUDE.md',
+            level: 'error',
+            msg: `CLAUDE.md is ${lines} lines, exceeds ${CLAUDE_MD_MAX_LINES}-line cap`,
+          });
+        }
+      }
+    }
+
     const errors = findings.filter((f) => f.level === 'error');
     const label = path.relative(process.cwd(), bundle).split(path.sep).join('/') || bundle;
     if (findings.length === 0) {
