@@ -48,24 +48,33 @@ my own repos, and any bundle that passes it is also a valid OKF bundle.
 | 10 | `index.md` stays ≤ 60 lines (routing, not payload) | n/a | **required** |
 | 11 | Concept file stays ≤ 8 KB | n/a | **required** |
 | 12 | Repo-root `CLAUDE.md` stays ≤ 60 lines (if present) | n/a | **required** |
+| 13 | Repo-root `FILE-MAP.md` exists and every row declares a purpose | n/a | **required** |
 
 ## Relationship to ICM
 
-Rules 9–12 borrow the "small, navigable, reachable" discipline of the
+Rules 9–13 borrow the "small, navigable, reachable" discipline of the
 [Interpretable Context Methodology](https://github.com/RinDig/icm-architect): an
 entry point should route rather than contain, individual context files should
 stay small enough to read in one pass, and nothing should be left dangling and
 unreferenced. That's the useful part, and it transfers cleanly to any repo.
 
+Rule 13 takes ICM's Context map line directly — *"`FILE-MAP.md` — GENERATED
+index — agents jump here, never crawl"*. The map must be **generated from what
+the code already declares** (Go package doc comments, Python module docstrings,
+TSDoc `@packageDocumentation` blocks) rather than hand-written, so it cannot
+drift from the source. A blank Purpose is an error precisely because it marks a
+directory nothing describes — the map is a coverage gate, not decoration.
+
 What was deliberately **not** borrowed: numbered stage folders (`01_`, `02_`),
 per-folder `CONTEXT.md` contracts, factory/product separation, human edit gates,
-and `output/` directories. Those encode a sequential, human-in-the-loop pipeline
-*workspace* — a place where stages hand off artifacts to a human before the next
-stage runs. A Next.js app or a Go service is not that; its directory structure is
-already dictated by its framework and build tooling. Layering ICM's pipeline
-scaffolding on top would mean fighting the toolchain for no gain, so this profile
-takes only the shape constraints (reachability, size caps) and leaves the
-workflow scaffolding behind.
+and `output/` directories. ICM selects a form by asking *"what is the repeating
+unit of work?"* — a run, a portfolio of runs, a record, the knowledge itself, or
+an organization. Source code is none of them, and ICM's own Pipeline notes warn
+against *"pipelines built before the process has actually repeated"*. Numbering
+source directories is build-coupled besides: it rewrites every Go import path,
+and in a Next.js App Router project it changes public URLs. This profile takes
+ICM's shape constraints and its generated index, and leaves the workflow
+scaffolding behind.
 
 ## Concept frontmatter
 
