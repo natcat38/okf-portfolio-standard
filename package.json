@@ -11,6 +11,6 @@
   "scripts": {
     "validate": "node bin/okf-validate.mjs",
     "selftest": "node bin/okf-validate.mjs tests/fixtures/good/knowledge",
-    "run-all": "node bin/okf-validate.mjs ../rpg-build-optimizer ../f1-race-tracker ../trip-planner"
+    "run-all": "node bin/okf-validate.mjs ../rpg-build-optimizer ../f1-race-tracker ../trip-planner ../invoicely"
   }
 }

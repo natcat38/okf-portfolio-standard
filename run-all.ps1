@@ -4,7 +4,8 @@ $ErrorActionPreference = 'Stop'
 $repos = @(
   '../rpg-build-optimizer',
   '../f1-race-tracker',
-  '../trip-planner'
+  '../trip-planner',
+  '../invoicely'
 )
 node "$PSScriptRoot/bin/okf-validate.mjs" @repos
 exit $LASTEXITCODE
