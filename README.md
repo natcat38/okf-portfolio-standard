@@ -14,7 +14,12 @@ and this repo is the single source of truth for the rules and the check.
 Beyond the original OKF-derived checks, the validator also enforces that every
 concept is reachable from `index.md` (no orphans), that `index.md` and any
 repo-root `CLAUDE.md` stay short (routing, not payload), and that concept files
-stay under a size budget — see rules 9-12 in `STANDARD.md`.
+stay under a size budget — see rules 9-12 in `STANDARD.md`. Rules 9-13 borrow
+the "small, navigable, reachable" discipline (and the generated `FILE-MAP.md`
+index) from Jake Van Clief's
+[Interpretable Context Methodology (ICM)](https://github.com/RinDig/icm-architect)
+— see "Relationship to ICM" in `STANDARD.md` for what was adopted and what
+wasn't.
 
 ## Validate locally
 
