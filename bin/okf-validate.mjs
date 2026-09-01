@@ -14,7 +14,8 @@
 // The house standard = OKF v0.1 with a few rules tightened (see STANDARD.md):
 //   - a `knowledge/` bundle must exist and contain at least one concept file
 //   - `knowledge/index.md` is required and must have NO frontmatter
-//   - every concept needs non-empty `type`, `title`, `description`, `timestamp`
+//   - every concept needs non-empty `type`, `title`, `description`, `timestamp`,
+//     `resource`, and `tags`
 //   - `timestamp` must be valid ISO 8601
 //   - internal links (`/abs` and `./rel`) must resolve
 //   - concept filenames must be kebab-case
@@ -199,6 +200,14 @@ function validateBundle(bundleDir) {
         }
         if (data.timestamp && !isIso8601(String(data.timestamp))) {
           add(rel(file), `timestamp is not valid ISO 8601: "${data.timestamp}"`);
+        }
+        // Rule 14 — resource + tags, promoted from recommended after all three
+        // consumer repos used both on 100% of concepts.
+        for (const key of ['resource', 'tags']) {
+          const v = data[key];
+          if (v === undefined || v === null || String(v).trim() === '') {
+            add(rel(file), `frontmatter missing required field: ${key}`);
+          }
         }
       }
     }

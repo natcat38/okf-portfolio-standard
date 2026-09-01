@@ -49,6 +49,7 @@ my own repos, and any bundle that passes it is also a valid OKF bundle.
 | 11 | Concept file stays ≤ 8 KB | n/a | **required** |
 | 12 | Repo-root `CLAUDE.md` stays ≤ 60 lines (if present) | n/a | **required** |
 | 13 | Repo-root `FILE-MAP.md` exists and every row declares a purpose | n/a | **required** |
+| 14 | Concept has non-empty `resource` and `tags` | recommended | **required** |
 
 ## Relationship to ICM
 
@@ -76,6 +77,17 @@ and in a Next.js App Router project it changes public URLs. This profile takes
 ICM's shape constraints and its generated index, and leaves the workflow
 scaffolding behind.
 
+Rule 14 is not from ICM — `resource` and `tags` were promoted from recommended
+to required only after every concept file in all three consumer repos already
+carried both (ICM's own "wait for three independent instances" bar).
+
+One ICM addition worth consulting outside the validator: its
+[reference-integrity](https://github.com/RinDig/icm-architect/blob/main/references/reference-integrity.md)
+checklist (Aug 2026) for safely moving or renaming files — search for referrers
+first (including external ones), copy → verify → remove, and watch for
+case-folded filename collisions on Windows/macOS. This validator only checks a
+bundle's steady-state shape; use that checklist when *restructuring* one.
+
 ## Concept frontmatter
 
 ```yaml
@@ -83,8 +95,8 @@ scaffolding behind.
 type: Domain Entity          # required — free-form category string
 title: Artifact              # required — human-readable name
 description: One sentence.    # required — single-sentence summary
-resource: https://…          # recommended — URI of the underlying asset, if any
-tags: [domain, gear]         # recommended — cross-cutting labels
+resource: https://…          # required — URI or repo-relative path of the underlying asset
+tags: [domain, gear]         # required — cross-cutting labels, at least one
 timestamp: 2026-06-15T00:00:00Z  # required — ISO 8601, last meaningful change
 ---
 ```
