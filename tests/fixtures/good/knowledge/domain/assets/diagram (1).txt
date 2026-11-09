@@ -1,0 +1,2 @@
+Placeholder asset. Its name has a space and parentheses on purpose, so the
+self-test proves the link checker URL-decodes targets and keeps balanced parens.

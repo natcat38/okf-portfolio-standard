@@ -63,8 +63,9 @@ Rule 13 takes ICM's Context map line directly — *"`FILE-MAP.md` — GENERATED
 index — agents jump here, never crawl"*. The map must be **generated from what
 the code already declares** (Go package doc comments, Python module docstrings,
 TSDoc `@packageDocumentation` blocks) rather than hand-written, so it cannot
-drift from the source. A blank Purpose is an error precisely because it marks a
-directory nothing describes — the map is a coverage gate, not decoration.
+drift from the source. A blank Purpose is an error because it marks a directory nothing describes.
+The check reads the rows the map lists; it does not compare them against the
+directories on disk, so a generator that skips a directory is not caught here.
 
 What was deliberately **not** borrowed: numbered stage folders (`01_`, `02_`),
 per-folder `CONTEXT.md` contracts, factory/product separation, human edit gates,

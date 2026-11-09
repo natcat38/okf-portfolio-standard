@@ -1,7 +1,7 @@
 {
   "name": "okf-portfolio-standard",
-  "version": "1.3.0",
-  "description": "An OKF house profile + validator that keeps my portfolio repos' knowledge bundles conformant.",
+  "version": "1.4.0",
+  "description": "An OKF house profile and validator that keeps the knowledge bundles in five portfolio repos conformant.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -10,7 +10,7 @@
   },
   "scripts": {
     "validate": "node bin/okf-validate.mjs",
-    "selftest": "node bin/okf-validate.mjs tests/fixtures/good/knowledge",
-    "run-all": "node bin/okf-validate.mjs ../rpg-build-optimizer ../f1-race-tracker ../trip-planner ../invoicely"
+    "selftest": "node tests/run.mjs",
+    "run-all": "node bin/okf-validate.mjs ../rpg-build-optimizer ../f1-race-tracker ../trip-planner ../invoicely ../task-router"
   }
 }
