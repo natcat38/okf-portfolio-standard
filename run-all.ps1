@@ -5,7 +5,8 @@ $repos = @(
   '../rpg-build-optimizer',
   '../f1-race-tracker',
   '../trip-planner',
-  '../invoicely'
+  '../invoicely',
+  '../task-router'
 )
 node "$PSScriptRoot/bin/okf-validate.mjs" @repos
 exit $LASTEXITCODE

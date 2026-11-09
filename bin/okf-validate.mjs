@@ -74,35 +74,83 @@ function splitFrontmatter(text) {
   };
 }
 
+// YAML's null spellings. A required field set to one of these is not present.
+const YAML_NULLS = new Set(['null', 'Null', 'NULL', '~']);
+
+// Why a single scalar value is not the flat YAML this standard allows, or null.
+// ponytail: a few targeted checks, not a YAML parser. Upgrade path: a real
+// parser (e.g. `yaml`) if bundles ever need nested values.
+function scalarProblem(val) {
+  const q = val[0];
+  if (q === '"' || q === "'") {
+    return val.length < 2 || !val.endsWith(q) ? 'quoted value is not closed' : null;
+  }
+  if (/^[>|][-+0-9]*$/.test(val)) {
+    return 'block scalars (> or |) are not supported; keep the value on one line';
+  }
+  if (/:\s/.test(val)) return 'unquoted value contains ": "; quote it';
+  return null;
+}
+
 // Parse flat YAML frontmatter: `key: value`, inline `[a, b]`, and block lists.
+// Returns the data plus a list of problems: anything this flat dialect cannot
+// read is reported rather than silently kept as a string.
 function parseFrontmatter(fmLines) {
   const data = {};
+  const problems = [];
   let curKey = null;
   for (const raw of fmLines) {
     if (!raw.trim() || raw.trim().startsWith('#')) continue;
     const listItem = raw.match(/^\s*-\s+(.*)$/);
     if (listItem && curKey) {
       if (!Array.isArray(data[curKey])) data[curKey] = [];
-      data[curKey].push(stripQuotes(listItem[1]));
+      const item = listItem[1].trim();
+      const bad = scalarProblem(item);
+      if (bad) problems.push(`${curKey}: list item ${bad}`);
+      data[curKey].push(stripQuotes(item));
       continue;
     }
     const kv = raw.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (kv) {
-      const key = kv[1];
-      const val = kv[2].trim();
-      curKey = key;
-      if (val === '') data[key] = '';
-      else if (val.startsWith('[') && val.endsWith(']')) {
-        data[key] = val.slice(1, -1).split(',').map((s) => stripQuotes(s)).filter(Boolean);
-      } else data[key] = stripQuotes(val);
+    if (!kv) {
+      problems.push(`unreadable line: "${raw.trim()}"`);
+      continue;
+    }
+    const key = kv[1];
+    const val = kv[2].trim();
+    if (Object.hasOwn(data, key)) problems.push(`duplicate key: ${key}`);
+    curKey = key;
+    if (val === '' || YAML_NULLS.has(val)) data[key] = '';
+    else if (val.startsWith('[')) {
+      if (!val.endsWith(']')) {
+        problems.push(`${key}: inline list is not closed with ]`);
+        data[key] = val;
+      } else {
+        const items = val.slice(1, -1).split(',').map((x) => x.trim()).filter(Boolean);
+        for (const item of items) {
+          const bad = scalarProblem(item);
+          if (bad) problems.push(`${key}: list item ${bad}`);
+        }
+        data[key] = items.map(stripQuotes);
+      }
+    } else {
+      const bad = scalarProblem(val);
+      if (bad) problems.push(`${key}: ${bad}`);
+      data[key] = stripQuotes(val);
     }
   }
-  return data;
+  return { data, problems };
 }
 
 function isIso8601(v) {
   if (typeof v !== 'string') return false;
   if (!/^\d{4}-\d{2}-\d{2}([Tt ]\d{2}:\d{2}(:\d{2})?(\.\d+)?([Zz]|[+-]\d{2}:?\d{2})?)?$/.test(v)) {
+    return false;
+  }
+  // `new Date('2026-02-31')` rolls over to 3 March instead of failing, so the
+  // calendar date is checked on its own: it must survive a round trip.
+  const [y, m, d] = v.slice(0, 10).split('-').map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d));
+  if (day.getUTCFullYear() !== y || day.getUTCMonth() !== m - 1 || day.getUTCDate() !== d) {
     return false;
   }
   return !Number.isNaN(new Date(v).getTime());
@@ -137,19 +185,56 @@ function undocumentedDirs(text) {
   return out;
 }
 
+// Blank out fenced code blocks and inline code, so a concept can show link
+// syntax as an example without it being checked as a real link.
+function stripCode(body) {
+  return body
+    .replace(/^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm, '')
+    .replace(/`[^`\n]*`/g, '');
+}
+
 // Pull internal link targets out of markdown (skips external + anchor-only links).
+// A target may hold one level of balanced parentheses, e.g. `./x(1).md`, and is
+// URL-decoded, so `./my%20file.md` resolves to `my file.md`.
 function internalLinks(body) {
   const targets = [];
-  const re = /\[[^\]]*\]\(([^)]+)\)/g;
+  const re = /\[[^\]]*\]\(((?:[^()]|\([^()]*\))+)\)/g;
   let m;
-  while ((m = re.exec(body)) !== null) {
+  const text = stripCode(body);
+  while ((m = re.exec(text)) !== null) {
     let target = m[1].trim().split(/\s+/)[0]; // drop optional `"title"`
     if (!target) continue;
     if (/^(https?:|mailto:|tel:|#)/i.test(target)) continue;
     target = target.split('#')[0]; // drop fragment
+    try { target = decodeURIComponent(target); } catch { /* keep it as written */ }
     if (target) targets.push(target);
   }
   return targets;
+}
+
+// existsSync is case-insensitive on Windows and macOS, so a link to `./A.md`
+// passes locally while Linux CI fails on `a.md`. Check each path segment's
+// exact spelling against its directory listing, up to `stopAt`.
+function existsExact(p, stopAt) {
+  if (!fs.existsSync(p)) return false;
+  let cur = path.resolve(p);
+  const stop = path.resolve(stopAt);
+  while (cur !== stop && path.dirname(cur) !== cur) {
+    const dir = path.dirname(cur);
+    let names;
+    try { names = fs.readdirSync(dir); } catch { return true; }
+    if (!names.includes(path.basename(cur))) return false;
+    cur = dir;
+  }
+  return true;
+}
+
+// A link resolves when its target exists with the exact spelling; a `.md`
+// link must also be a file, not a directory that happens to share the name.
+function linkResolves(resolved, root) {
+  if (!existsExact(resolved, root)) return false;
+  if (resolved.toLowerCase().endsWith('.md')) return fs.statSync(resolved).isFile();
+  return true;
 }
 
 // ---------- validation ----------
@@ -191,7 +276,8 @@ function validateBundle(bundleDir) {
       if (!fm.has) add(rel(file), 'missing YAML frontmatter (must open with ---)');
       else if (fm.unterminated) add(rel(file), 'frontmatter block is not closed with ---');
       else {
-        const data = parseFrontmatter(fm.fmLines);
+        const { data, problems } = parseFrontmatter(fm.fmLines);
+        for (const p of problems) add(rel(file), `frontmatter ${p}`);
         for (const key of ['type', 'title', 'description', 'timestamp']) {
           const v = data[key];
           if (v === undefined || v === null || String(v).trim() === '') {
@@ -218,7 +304,7 @@ function validateBundle(bundleDir) {
       const resolved = target.startsWith('/')
         ? path.join(bundleDir, target.slice(1))
         : path.resolve(path.dirname(file), target);
-      if (!fs.existsSync(resolved)) {
+      if (!linkResolves(resolved, path.dirname(bundleDir))) {
         add(rel(file), `broken internal link: ${target}`);
       }
     }
@@ -241,7 +327,7 @@ function validateBundle(bundleDir) {
         const resolved = target.startsWith('/')
           ? path.join(bundleDir, target.slice(1))
           : path.resolve(path.dirname(cur), target);
-        if (fs.existsSync(resolved) && !visited.has(resolved)) {
+        if (linkResolves(resolved, path.dirname(bundleDir)) && !visited.has(resolved)) {
           visited.add(resolved);
           queue.push(resolved);
         }
